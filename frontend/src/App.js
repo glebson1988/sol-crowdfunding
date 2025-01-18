@@ -1,4 +1,5 @@
 import './App.css';
+import './idl.json';
 import { useEffect, useState } from 'react';
 
 const App = () => {
