@@ -1,10 +1,10 @@
 import './App.css';
 import idl from './idl.json';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
-import { Program, AnchorProvider, web3, utils } from '@project-serum/anchor';
+import { Program, AnchorProvider, web3, utils } from "@coral-xyz/anchor";
 import { useEffect, useState } from 'react';
 
-const programID = new PublicKey(idl.programId);
+const programID = new PublicKey(idl.address);
 const network = clusterApiUrl('devnet');
 const opts = {
     preflightCommitment: 'processed',
