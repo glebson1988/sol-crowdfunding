@@ -3,8 +3,9 @@ import idl from './idl.json';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import { Program, AnchorProvider, web3, utils } from "@coral-xyz/anchor";
 import { useEffect, useState } from 'react';
+import { Buffer } from "buffer";
+window.Buffer = Buffer;
 
-const programID = new PublicKey(idl.address);
 const network = clusterApiUrl('devnet');
 const opts = {
     preflightCommitment: 'processed',
@@ -56,7 +57,7 @@ const App = () => {
     const createCampaign = async () => {
         try {
             const provider = getProvider();
-            const program = new Program(idl, programID, provider);
+            const program = new Program(idl, provider);
             const [campaign] = await PublicKey.findProgramAddressSync(
                 [
                     utils.bytes.utf8.encode('CAMPAIGN_DEMO'),
