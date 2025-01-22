@@ -14,11 +14,14 @@ const { SystemProgram } = web3;
 
 const App = () => {
     const [wallet, setWallet] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
+
     const getProvider = () => {
         const connection = new Connection(network, opts.preflightCommitment);
         const provider = new AnchorProvider(connection, window.solana, opts.preflightCommitment);
         return provider;
-    }
+    };
+
     const checkIfWalletIsConnected = async () => {
         try {
             const { solana } = window;
@@ -54,30 +57,52 @@ const App = () => {
         }
     };
 
+    const getCampaigns = async () => {
+    try {
+        const connection = new Connection(network, opts.preflightCommitment);
+        const provider = getProvider();
+        const program = new Program(idl, provider);
+
+        // Получаем все аккаунты кампаний
+        const campaignAccounts = await connection.getProgramAccounts(program.programId);
+
+        const campaigns = await Promise.all(
+            campaignAccounts.map(async (campaign) => {
+                const accountData = await program.account.campaign.fetch(campaign.pubkey);
+                return {
+                    campaignId: campaign.pubkey.toString(), // Преобразование PublicKey в строку
+                    name: accountData.name,
+                    description: accountData.description,
+                    balance: accountData.amountDonated ? accountData.amountDonated / web3.LAMPORTS_PER_SOL : 0, // Проверка на нулевое значение
+                };
+            })
+        );
+
+        setCampaigns(campaigns);
+    } catch (error) {
+        console.error('Error fetching campaigns:', error);
+    }
+};
+
     const createCampaign = async () => {
         try {
             const provider = getProvider();
             const program = new Program(idl, provider);
             const [campaign] = await PublicKey.findProgramAddressSync(
-                [
-                    utils.bytes.utf8.encode('CAMPAIGN_DEMO'),
-                    provider.wallet.publicKey.toBuffer(),
-                ],
+                [utils.bytes.utf8.encode('CAMPAIGN_DEMO'), provider.wallet.publicKey.toBuffer()],
                 program.programId
             );
-            await program.rpc.create('Campaign Demo', 'Campain Description', {
-                accounts: {
-                    campaign,
-                    user: provider.wallet.publicKey,
-                    systemProgram: SystemProgram.programId,
-                },
-            });
+            await program.methods.create('Campaign Demo', 'Campaign Description').accounts({
+                campaign,
+                user: provider.wallet.publicKey,
+                systemProgram: SystemProgram.programId,
+            }).rpc();
+
             console.log('Campaign created:', campaign.toString());
-        }
-        catch (error) {
+        } catch (error) {
             console.error('Error creating campaign:', error);
         }
-    }
+    };
 
     const renderNotConnectedContainer = () => {
         return (
@@ -90,12 +115,31 @@ const App = () => {
     const renderConnectedContainer = () => {
         return (
             <div>
+                <h3>Wallet: {wallet}</h3>
                 <button onClick={createCampaign} className="btn btn-primary">
                     Create Campaign
                 </button>
+                <button onClick={getCampaigns} className="btn btn-secondary">
+                    Fetch Campaigns
+                </button>
+                <div className="campaign-list">
+                    {campaigns.length > 0 ? (
+                        <ul>
+                            {campaigns.map((campaign) => (
+                                <li key={campaign.campaignId}>
+                                    <h3>{campaign.name}</h3>
+                                    <p>{campaign.description}</p>
+                                    <p>Balance: {campaign.balance} SOL</p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No campaigns found.</p>
+                    )}
+                </div>
             </div>
         );
-    }
+    };
 
     useEffect(() => {
         const onLoad = async () => {
