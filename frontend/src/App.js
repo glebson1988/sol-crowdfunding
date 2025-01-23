@@ -1,7 +1,7 @@
 import './App.css';
 import idl from './idl.json';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
-import { Program, AnchorProvider, web3, utils } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, web3, utils, BN } from "@coral-xyz/anchor";
 import { useEffect, useState } from 'react';
 import { Buffer } from "buffer";
 window.Buffer = Buffer;
@@ -58,31 +58,32 @@ const App = () => {
     };
 
     const getCampaigns = async () => {
-    try {
-        const connection = new Connection(network, opts.preflightCommitment);
-        const provider = getProvider();
-        const program = new Program(idl, provider);
+        try {
+            const connection = new Connection(network, opts.preflightCommitment);
+            const provider = getProvider();
+            const program = new Program(idl, provider);
+            const campaignAccounts = await connection.getProgramAccounts(program.programId);
 
-        // Получаем все аккаунты кампаний
-        const campaignAccounts = await connection.getProgramAccounts(program.programId);
+            const campaigns = await Promise.all(
+                campaignAccounts.map(async (campaign) => {
+                    const accountData = await program.account.campaign.fetch(campaign.pubkey);
+                    return {
+                        campaignId: campaign.pubkey.toString(),
+                        pubkey: campaign.pubkey,
+                        name: accountData.name,
+                        description: accountData.description,
+                        balance: accountData.amountDonated
+                            ? accountData.amountDonated / web3.LAMPORTS_PER_SOL
+                            : 0,
+                    };
+                })
+            );
 
-        const campaigns = await Promise.all(
-            campaignAccounts.map(async (campaign) => {
-                const accountData = await program.account.campaign.fetch(campaign.pubkey);
-                return {
-                    campaignId: campaign.pubkey.toString(), // Преобразование PublicKey в строку
-                    name: accountData.name,
-                    description: accountData.description,
-                    balance: accountData.amountDonated ? accountData.amountDonated / web3.LAMPORTS_PER_SOL : 0, // Проверка на нулевое значение
-                };
-            })
-        );
-
-        setCampaigns(campaigns);
-    } catch (error) {
-        console.error('Error fetching campaigns:', error);
-    }
-};
+            setCampaigns(campaigns);
+        } catch (error) {
+            console.error('Error fetching campaigns:', error);
+        }
+    };
 
     const createCampaign = async () => {
         try {
@@ -101,6 +102,35 @@ const App = () => {
             console.log('Campaign created:', campaign.toString());
         } catch (error) {
             console.error('Error creating campaign:', error);
+        }
+    };
+
+    const donate = async (campaignPublicKey) => {
+        try {
+            if (!campaignPublicKey) {
+                throw new Error("Campaign public key is undefined or invalid.");
+            }
+
+            const campaignKey = new PublicKey(campaignPublicKey);
+            const provider = getProvider();
+            const program = new Program(idl, provider);
+            const amount = new BN(0.2 * web3.LAMPORTS_PER_SOL);
+
+            console.log("Donating amount (lamports):", amount.toString());
+            console.log("Campaign PublicKey:", campaignKey.toString());
+
+            await program.rpc.donate(amount, {
+                accounts: {
+                    campaign: campaignKey,
+                    user: provider.wallet.publicKey,
+                    systemProgram: SystemProgram.programId,
+                },
+            });
+
+            console.log("Donated to campaign:", campaignKey.toString());
+            await getCampaigns();
+        } catch (error) {
+            console.error("Error donating to campaign:", error);
         }
     };
 
@@ -129,7 +159,11 @@ const App = () => {
                                 <li key={campaign.campaignId}>
                                     <h3>{campaign.name}</h3>
                                     <p>{campaign.description}</p>
+                                    <p>Public Key: {campaign.pubkey.toString()}</p>
                                     <p>Balance: {campaign.balance} SOL</p>
+                                    <button onClick={() => donate(campaign.pubkey)} className="btn btn-primary">
+                                        Donate
+                                    </button>
                                 </li>
                             ))}
                         </ul>
