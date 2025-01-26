@@ -134,6 +134,31 @@ const App = () => {
         }
     };
 
+    const withdraw = async (campaignPublicKey) => {
+        try {
+            if (!campaignPublicKey) {
+                throw new Error("Campaign public key is undefined or invalid.");
+            }
+
+            const campaignKey = new PublicKey(campaignPublicKey);
+            const provider = getProvider();
+            const program = new Program(idl, provider);
+            const amount = new BN(0.2 * web3.LAMPORTS_PER_SOL);
+
+            console.log("Withdrawing amount (lamports):", amount.toString());
+            console.log("Campaign PublicKey:", campaignKey.toString());
+
+            await program.rpc.withdraw(amount, {
+                accounts: {
+                    campaign: campaignKey,
+                    user: provider.wallet.publicKey,
+                },
+            });
+        } catch (error) {
+            console.error("Error withdrawing from campaign:", error);
+        }
+    };
+
     const renderNotConnectedContainer = () => {
         return (
             <button onClick={connectWallet} className="btn btn-primary">
@@ -163,6 +188,9 @@ const App = () => {
                                     <p>Balance: {campaign.balance} SOL</p>
                                     <button onClick={() => donate(campaign.pubkey)} className="btn btn-primary">
                                         Donate
+                                    </button>
+                                    <button onClick={() => withdraw(campaign.pubkey)} className="btn btn-secondary">
+                                        Withdraw
                                     </button>
                                 </li>
                             ))}
